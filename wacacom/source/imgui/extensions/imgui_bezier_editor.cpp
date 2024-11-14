@@ -133,14 +133,20 @@ bool ImGui::BezierEditor(std::string_view label, ImVec2 const& dimensions, float
 
     if (window->SkipItems) return false;
 
+    ImGui::BeginGroup();
+
     ImGui::Text("%s", label.data());
     static auto changed = false;
     auto hovered = IsItemActive() || IsItemHovered();
-    Dummy(ImVec2(0, 3));
+    // Dummy(ImVec2(0, 3));
 
     ImRect const editorFrame(window->DC.CursorPos, window->DC.CursorPos + dimensions);
     ItemSize(editorFrame);
-    if (!ItemAdd(editorFrame, 0)) return changed;
+    if (!ItemAdd(editorFrame, 0))
+    {
+        ImGui::EndGroup();
+        return changed;
+    }
 
     hovered |= IsItemHovered();
 
@@ -161,7 +167,9 @@ bool ImGui::BezierEditor(std::string_view label, ImVec2 const& dimensions, float
         ImGui::BeginGroup();
             changed = ImGui::SliderFloat(fmt::format("##2{}", label.data()).data(), &points[2], 0, 1);
             changed = ImGui::SliderFloat(fmt::format("##3{}", label.data()).data(), &points[3], 0, 1);
-        ImGui::PopItemWidth();
+        ImGui::EndGroup();
+    ImGui::PopItemWidth();
+
     ImGui::EndGroup();
 
     return changed;
