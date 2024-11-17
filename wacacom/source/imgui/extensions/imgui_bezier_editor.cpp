@@ -95,6 +95,7 @@ static bool draw_anchor_grabbers(ImDrawList* const drawList, std::string_view la
             auto const x = static_cast<double>(points[i * 2 + 0]);
             auto const y = static_cast<double>(points[i * 2 + 1]);
             ImGui::SetTooltip("(%4.3f, %4.3f)", x, y);
+            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
         }
 
         if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left))
