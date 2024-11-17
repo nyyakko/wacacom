@@ -5,6 +5,7 @@
 #include <fmt/format.h>
 #include <GLFW/glfw3.h>
 #include <fplus/fplus.hpp>
+#include <span>
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 
@@ -14,8 +15,6 @@
 #include "imgui/imgui_internal.h"
 
 #include "imgui/extensions/imgui_bezier_editor.hpp"
-
-#include <ranges>
 
 #define H_SPACING(COUNT) ImGui::SetCursorPosY(ImGui::GetCursorPosY() + COUNT);
 
@@ -324,7 +323,9 @@ void update_device_settings(ApplicationContext& ctx)
 
 void main_window()
 {
-    ImGui::Begin("XSetWacomGUI", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoResize);
+    ImGui::Begin("Wacacom", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoResize);
+
+    auto* drawList = ImGui::GetWindowDrawList();
 
     static ApplicationContext ctx {};
 
@@ -388,6 +389,13 @@ void main_window()
         ImGui::SameLine();
         ImGui::BezierEditor("Pressure Curve", { 300, 300 }, ctx.pressureCurvePoints.data());
     ImGui::EndGroup();
+
+    for (auto const& [tabletArea, monitorArea] :
+            fplus::zip(std::span<ImVec2>(ctx.mappedMonitorAreaPosition, 4),
+                       std::span<ImVec2>(ctx.mappedTabletAreaPosition, 4)))
+    {
+        drawList->AddLine(tabletArea, monitorArea, ImColor(1.f, 0.f, 0.f, 0.5f), 2.f);
+    }
 
     ImGui::SetCursorPos({ ImGui::GetWindowWidth() - (ImGui::GetCursorPosX() + 200), ImGui::GetWindowHeight() - (ImGui::GetCursorPosX() + 35) });
     if (ImGui::Button("Apply", { 200, 35 }))
