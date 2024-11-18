@@ -29,8 +29,8 @@ static std::vector<ImVec2> bezier_table(std::array<ImVec2, 4> const& points, int
         auto const pointD = t*t*t;
 
         result.push_back({
-            pointA*points[0].x + pointB*points[1].x + pointC*points[2].x + pointD*points[3].x,
-            pointA*points[0].y + pointB*points[1].y + pointC*points[2].y + pointD*points[3].y
+            pointA*points.at(0).x + pointB*points.at(1).x + pointC*points.at(2).x + pointD*points.at(3).x,
+            pointA*points.at(0).y + pointB*points.at(1).y + pointC*points.at(2).y + pointD*points.at(3).y
         });
     }
 
@@ -60,22 +60,23 @@ static void draw_background_grid(ImDrawList* const drawList, ImVec2 const& dimen
     }
 }
 
-static void draw_bezier_curves(ImDrawList* const drawList, float points[4], ImRect const& editorFrame)
+static void draw_bezier_curves(ImDrawList* const drawList, std::array<float, 4> const& points, ImRect const& editorFrame)
 {
     static ImColor const COLOR = ImGui::GetStyle().Colors[ImGuiCol_PlotLines];
 
-    auto const bezier = bezier_table({{{ 0, 0 }, { points[0], points[1] }, { points[2], points[3] }, { 1, 1 }}}, SMOOTHNESS);
+    auto const bezier = bezier_table({{{ 0, 0 }, { points.at(0), points.at(1) }, { points.at(2), points.at(3) }, { 1, 1 }}}, SMOOTHNESS);
+
     for (auto i = 0zu; i < SMOOTHNESS; i += 1)
     {
-        ImVec2 const p(bezier[i + 0].x, 1 - bezier[i + 0].y);
-        ImVec2 const q(bezier[i + 1].x, 1 - bezier[i + 1].y);
+        ImVec2 const p(bezier.at(i + 0).x, 1 - bezier.at(i + 0).y);
+        ImVec2 const q(bezier.at(i + 1).x, 1 - bezier.at(i + 1).y);
         ImVec2 const r(p.x * (editorFrame.Max.x - editorFrame.Min.x) + editorFrame.Min.x, p.y * (editorFrame.Max.y - editorFrame.Min.y) + editorFrame.Min.y);
         ImVec2 const s(q.x * (editorFrame.Max.x - editorFrame.Min.x) + editorFrame.Min.x, q.y * (editorFrame.Max.y - editorFrame.Min.y) + editorFrame.Min.y);
         drawList->AddLine(r, s, COLOR, CURVE_WIDTH);
     }
 }
 
-static bool draw_anchor_grabbers(ImDrawList* const drawList, std::string_view label, float points[4], ImRect const& editorFrame, ImVec2 const& dimensions)
+static bool draw_anchor_grabbers(ImDrawList* const drawList, std::string_view label, std::array<float, 4>& points, ImRect const& editorFrame, ImVec2 const& dimensions)
 {
     static ImColor const BORDER_COLOR = ImGui::GetStyle().Colors[ImGuiCol_Text];
     static ImColor const COLOR = ImGui::GetStyle().Colors[ImGuiCol_ButtonActive];
@@ -83,17 +84,17 @@ static bool draw_anchor_grabbers(ImDrawList* const drawList, std::string_view la
     auto changed = false;
 
     static auto const tooltip = fmt::format("##{}", label);
-    for (auto i = 0; i < 2; ++i)
+    for (auto i = 0zu; i < 2; ++i)
     {
-        auto const pos = ImVec2(points[i * 2 + 0], 1 - points[i * 2 + 1]) * (editorFrame.Max - editorFrame.Min) + editorFrame.Min;
+        auto const pos = ImVec2(points.at(i * 2 + 0), 1 - points.at(i * 2 + 1)) * (editorFrame.Max - editorFrame.Min) + editorFrame.Min;
 
         ImGui::SetCursorScreenPos(pos - ImVec2(GRAB_RADIUS, GRAB_RADIUS));
         ImGui::InvisibleButton(fmt::format("{}{}", i, tooltip.data()).data(), ImVec2(2 * GRAB_RADIUS, 2 * GRAB_RADIUS));
 
         if (ImGui::IsItemActive() || ImGui::IsItemHovered())
         {
-            auto const x = static_cast<double>(points[i * 2 + 0]);
-            auto const y = static_cast<double>(points[i * 2 + 1]);
+            auto const x = static_cast<double>(points.at(i * 2 + 0));
+            auto const y = static_cast<double>(points.at(i * 2 + 1));
             ImGui::SetTooltip("(%4.3f, %4.3f)", x, y);
             ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
         }
@@ -101,17 +102,17 @@ static bool draw_anchor_grabbers(ImDrawList* const drawList, std::string_view la
         if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left))
         {
             auto const posX = ImGui::GetIO().MouseDelta.x / dimensions.x;
-            points[i * 2 + 0] += posX;
-            points[i * 2 + 0] = points[i * 2 + 0] < 0.f ? 0.f : points[i * 2 + 0] > 1.f ? 1.f : points[i * 2 + 0];
+            points.at(i * 2 + 0) += posX;
+            points.at(i * 2 + 0) = points.at(i * 2 + 0) < 0.f ? 0.f : points.at(i * 2 + 0) > 1.f ? 1.f : points.at(i * 2 + 0);
             auto const posY = ImGui::GetIO().MouseDelta.y / dimensions.y;
-            points[i * 2 + 1] -= posY;
-            points[i * 2 + 1] = points[i * 2 + 1] < 0.f ? 0.f : points[i * 2 + 1] > 1.f ? 1.f : points[i * 2 + 1];
+            points.at(i * 2 + 1) -= posY;
+            points.at(i * 2 + 1) = points.at(i * 2 + 1) < 0.f ? 0.f : points.at(i * 2 + 1) > 1.f ? 1.f : points.at(i * 2 + 1);
             changed = true;
         }
     }
 
-    auto const p1 = ImVec2(points[0], 1 - points[1]) * (editorFrame.Max - editorFrame.Min) + editorFrame.Min;
-    auto const p2 = ImVec2(points[2], 1 - points[3]) * (editorFrame.Max - editorFrame.Min) + editorFrame.Min;
+    auto const p1 = ImVec2(points.at(0), 1 - points.at(1)) * (editorFrame.Max - editorFrame.Min) + editorFrame.Min;
+    auto const p2 = ImVec2(points.at(2), 1 - points.at(3)) * (editorFrame.Max - editorFrame.Min) + editorFrame.Min;
 
     drawList->AddLine(ImVec2(editorFrame.Min.x, editorFrame.Max.y), p1, ImColor(BORDER_COLOR), LINE_WIDTH);
     drawList->AddLine(ImVec2(editorFrame.Max.x, editorFrame.Min.y), p2, ImColor(BORDER_COLOR), LINE_WIDTH);
@@ -126,7 +127,7 @@ static bool draw_anchor_grabbers(ImDrawList* const drawList, std::string_view la
     return changed;
 }
 
-bool ImGui::BezierEditor(std::string_view label, ImVec2 const& dimensions, float points[4])
+bool ImGui::BezierEditor(std::string_view label, ImVec2 const& dimensions, std::array<float, 4>& points)
 {
     auto const& style = GetStyle();
     auto* drawList = GetWindowDrawList();
@@ -134,9 +135,9 @@ bool ImGui::BezierEditor(std::string_view label, ImVec2 const& dimensions, float
 
     if (window->SkipItems) return false;
 
-    ImGui::BeginGroup();
+    BeginGroup();
 
-    ImGui::Text("%s", label.data());
+    Text("%s", label.data());
     static auto changed = false;
     auto hovered = IsItemActive() || IsItemHovered();
     // Dummy(ImVec2(0, 3));
@@ -145,7 +146,7 @@ bool ImGui::BezierEditor(std::string_view label, ImVec2 const& dimensions, float
     ItemSize(editorFrame);
     if (!ItemAdd(editorFrame, 0))
     {
-        ImGui::EndGroup();
+        EndGroup();
         return changed;
     }
 
@@ -159,19 +160,19 @@ bool ImGui::BezierEditor(std::string_view label, ImVec2 const& dimensions, float
     if (hovered || changed) drawList->PopClipRect();
     draw_anchor_grabbers(drawList, label, points, editorFrame, dimensions);
 
-    ImGui::PushItemWidth(dimensions.x / 2 - 3);
-        ImGui::BeginGroup();
-            changed = ImGui::SliderFloat(fmt::format("##0{}", label.data()).data(), &points[0], 0, 1);
-            changed = ImGui::SliderFloat(fmt::format("##1{}", label.data()).data(), &points[1], 0, 1);
-        ImGui::EndGroup();
-        ImGui::SameLine();
-        ImGui::BeginGroup();
-            changed = ImGui::SliderFloat(fmt::format("##2{}", label.data()).data(), &points[2], 0, 1);
-            changed = ImGui::SliderFloat(fmt::format("##3{}", label.data()).data(), &points[3], 0, 1);
-        ImGui::EndGroup();
-    ImGui::PopItemWidth();
+    PushItemWidth(dimensions.x / 2 - 3);
+        BeginGroup();
+            changed = SliderFloat(fmt::format("##0{}", label.data()).data(), &points.at(0), 0, 1);
+            changed = SliderFloat(fmt::format("##1{}", label.data()).data(), &points.at(1), 0, 1);
+        EndGroup();
+        SameLine();
+        BeginGroup();
+            changed = SliderFloat(fmt::format("##2{}", label.data()).data(), &points.at(2), 0, 1);
+            changed = SliderFloat(fmt::format("##3{}", label.data()).data(), &points.at(3), 0, 1);
+        EndGroup();
+    PopItemWidth();
 
-    ImGui::EndGroup();
+    EndGroup();
 
     return changed;
 }

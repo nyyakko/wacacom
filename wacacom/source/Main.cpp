@@ -5,7 +5,6 @@
 #include <fmt/format.h>
 #include <GLFW/glfw3.h>
 #include <fplus/fplus.hpp>
-#include <span>
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 
@@ -16,6 +15,8 @@
 
 #include "imgui/extensions/imgui_bezier_editor.hpp"
 
+#include <span>
+
 #define H_SPACING(COUNT) ImGui::SetCursorPosY(ImGui::GetCursorPosY() + COUNT);
 
 #define V_SPACING(COUNT) ImGui::SetCursorPosX(ImGui::GetCursorPosX() + COUNT);
@@ -25,10 +26,9 @@
     ImGui::Separator();  \
     H_SPACING(COUNT);
 
-[[maybe_unused]] static auto constexpr WIDGET_OFFSET = 8;
-[[maybe_unused]] static auto constexpr INPUT_WIDGET_WIDTH = 150;
-[[maybe_unused]] static auto constexpr GRAB_RADIUS = 6;
-[[maybe_unused]] static auto constexpr GRAB_BORDER = 2;
+static auto constexpr INPUT_WIDGET_WIDTH = 150;
+static auto constexpr GRAB_RADIUS = 6;
+static auto constexpr GRAB_BORDER = 2;
 
 static void draw_background_grid(ImDrawList* const drawList, ImVec2 const& dimensions, ImRect const& mappableRegion)
 {
@@ -108,25 +108,32 @@ static bool draw_anchor_grabbers(std::string_view label, ImDrawList* const drawL
     return changed;
 }
 
-static ImRect calculate_mapped_region(ImVec2 points[4], ImVec2 const& regionMapperSize, ImVec2 const& rootCursorPosition)
+static ImRect mapped_points_to_rect(ImVec2 points[4], ImVec2 const& mapperSize, ImVec2 const& cursorPosition)
 {
     ImVec2 const minArea (
-        lmap(points[0].x, 0.f, 1.f, 0.f, regionMapperSize.x) + rootCursorPosition.x,
-        lmap(1 - points[0].y, 0.f, 1.f, 0.f, regionMapperSize.y) + rootCursorPosition.y
+        lmap(points[0].x, 0.f, 1.f, 0.f, mapperSize.x) + cursorPosition.x,
+        lmap(1 - points[0].y, 0.f, 1.f, 0.f, mapperSize.y) + cursorPosition.y
     );
 
     ImVec2 const maxArea (
-        lmap(points[3].x, 0.f, 1.f, 0.f, regionMapperSize.x) + rootCursorPosition.x,
-        lmap(points[3].y, 0.f, 1.f, 0.f, regionMapperSize.y) + rootCursorPosition.y
+        lmap(points[3].x, 0.f, 1.f, 0.f, mapperSize.x) + cursorPosition.x,
+        lmap(points[3].y, 0.f, 1.f, 0.f, mapperSize.y) + cursorPosition.y
     );
 
     return { minArea, maxArea };
 }
 
-static bool draw_monitor_region_mapper(ImGuiWindow* const window, ImDrawList* const drawList, std::string_view label, ImVec2 const& dimensions, Display const& display, Region& mappedAreaOut, ImVec2 positionOut[4] = nullptr)
+bool MonitorRegionMapper(std::string_view label, ImVec2 const& dimensions, Display const& display, Region& mappedAreaOut, ImVec2 positionOut[4])
 {
     auto changed = false;
 
+    auto* window = ImGui::GetCurrentWindow();
+    auto* drawList = ImGui::GetWindowDrawList();
+
+    auto const currentPosition = ImGui::GetCursorPos();
+    ImGui::BeginGroup();
+    ImGui::Text("%s", label.data());
+    ImGui::SetCursorPosX(currentPosition.x);
     auto const rootCursorPosition = window->DC.CursorPos;
     ImRect const mappableRegion(rootCursorPosition, rootCursorPosition + dimensions);
     ImGui::ItemSize(mappableRegion);
@@ -158,7 +165,7 @@ static bool draw_monitor_region_mapper(ImGuiWindow* const window, ImDrawList* co
     };
 
     changed = draw_anchor_grabbers(label, drawList, mappedAreaPoints, dimensions, rootCursorPosition, positionOut, false, false);
-    auto const mappedRegion = calculate_mapped_region(mappedAreaPoints, dimensions, rootCursorPosition);
+    auto const mappedRegion = mapped_points_to_rect(mappedAreaPoints, dimensions, rootCursorPosition);
 
     ImGui::SetCursorScreenPos(currentCursorPosition);
 
@@ -178,28 +185,22 @@ static bool draw_monitor_region_mapper(ImGuiWindow* const window, ImDrawList* co
     auto const size = mappedRegion.Max - mappedRegion.Min;
     mappedAreaOut.width = lmap<int>(static_cast<int>(size.x), 0, static_cast<int>(dimensions.x), 0, static_cast<int>(display.width));
     mappedAreaOut.height = lmap<int>(static_cast<int>(size.y), 0, static_cast<int>(dimensions.y), 0, static_cast<int>(display.height));
-
-    return changed;
-}
-
-bool MonitorRegionMapper(std::string_view label, ImVec2 const& dimensions, Display const& display, Region& mappedMonitorAreaOut, ImVec2 positionOut[4])
-{
-    auto changed = false;
-
-    auto const currentPosition = ImGui::GetCursorPos();
-    ImGui::BeginGroup();
-    ImGui::Text("%s", label.data());
-    ImGui::SetCursorPosX(currentPosition.x);
-    changed = draw_monitor_region_mapper(ImGui::GetCurrentWindow(), ImGui::GetWindowDrawList(), label, dimensions, display, mappedMonitorAreaOut, positionOut);
     ImGui::EndGroup();
 
     return changed;
 }
 
-static bool draw_tablet_region_mapper(ImGuiWindow* const window, ImDrawList* const drawList, std::string_view label, ImVec2 const& dimensions, Device const& device, Region& mappedAreaOut, bool forceProportions, bool fullArea, ImVec2 positionOut[4] = nullptr)
+bool TabletRegionMapper(std::string_view label, ImVec2 const& dimensions, Device const& device, Region& mappedAreaOut, ImVec2 positionOut[4], bool& forceProportions, bool& fullArea)
 {
-    bool changed = false;
+    auto changed = false;
 
+    auto* window = ImGui::GetCurrentWindow();
+    auto* drawList = ImGui::GetWindowDrawList();
+
+    auto currentPosition = ImGui::GetCursorPos();
+    ImGui::BeginGroup();
+    ImGui::Text("%s", label.data());
+    ImGui::SetCursorPosX(currentPosition.x);
     auto const rootCursorPosition = window->DC.CursorPos;
     ImRect const mappableRegion(rootCursorPosition, rootCursorPosition + dimensions);
     ImGui::ItemSize(mappableRegion);
@@ -250,7 +251,7 @@ static bool draw_tablet_region_mapper(ImGuiWindow* const window, ImDrawList* con
 
     changed = draw_anchor_grabbers(label, drawList, mappedAreaPoints, dimensions, rootCursorPosition, positionOut, forceProportions);
     if (changed) fullArea = false;
-    auto const mappedRegion = calculate_mapped_region(mappedAreaPoints, dimensions, rootCursorPosition);
+    auto const mappedRegion = mapped_points_to_rect(mappedAreaPoints, dimensions, rootCursorPosition);
 
     ImGui::SetCursorScreenPos(currentCursorPosition);
 
@@ -275,22 +276,6 @@ static bool draw_tablet_region_mapper(ImGuiWindow* const window, ImDrawList* con
     mappedAreaOut.offsetX = lmap(static_cast<int>(offsetX), 0, static_cast<int>(dimensions.x), 0, static_cast<int>(availableArea.width));
     auto const offsetY = (mappedAreaPoints[2].y < 1.f ? 1 : 0) * static_cast<int>(dimensions.y - size.y);
     mappedAreaOut.offsetY = lmap(static_cast<int>(offsetY), 0, static_cast<int>(dimensions.y), 0, static_cast<int>(availableArea.height));
-
-    return changed;
-}
-
-bool TabletRegionMapper(std::string_view label, ImVec2 const& dimensions, Device const& device, Region& mappedTabletAreaOut, ImVec2 positionOut[4], bool& forceProportions, bool& fullArea)
-{
-    auto changed = false;
-
-    auto* window = ImGui::GetCurrentWindow();
-    auto* drawList = ImGui::GetWindowDrawList();
-
-    auto currentPosition = ImGui::GetCursorPos();
-    ImGui::BeginGroup();
-    ImGui::Text("%s", label.data());
-    ImGui::SetCursorPosX(currentPosition.x);
-    changed = draw_tablet_region_mapper(window, drawList, label, dimensions, device, mappedTabletAreaOut, forceProportions, fullArea, positionOut);
     ImGui::EndGroup();
 
     return changed;
@@ -387,7 +372,7 @@ void main_window()
             ImGui::EndGroup();
         ImGui::EndGroup();
         ImGui::SameLine();
-        ImGui::BezierEditor("Pressure Curve", { 300, 300 }, ctx.pressureCurvePoints.data());
+        ImGui::BezierEditor("Pressure Curve", { 300, 300 }, ctx.pressureCurvePoints);
     ImGui::EndGroup();
 
     for (auto const& [tabletArea, monitorArea] :
